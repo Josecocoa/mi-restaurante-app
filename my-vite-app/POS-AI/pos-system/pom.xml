@@ -1,0 +1,44 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" 
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Cambia estos valores por los de tu proyecto -->
+  <groupId>com.tuempresa</groupId>
+  <artifactId>nombre-de-tu-aplicacion</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <dependencies>
+    <!-- Agrega aquí las dependencias necesarias para tu aplicación.
+         Por ejemplo, si usas Spring Boot, puedes agregar:
+         <dependency>
+           <groupId>org.springframework.boot</groupId>
+           <artifactId>spring-boot-starter-web</artifactId>
+         </dependency>
+    -->
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Este plugin configura la generación de un JAR ejecutable -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.2.0</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <!-- Reemplaza com.tuempresa.MainClass con el nombre 
+completo de tu clase principal -->
+              <mainClass>com.tuempresa.MainClass</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+
+
