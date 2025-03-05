@@ -978,6 +978,7 @@ export default function POSSystem() {
     }
   }
 
+  // Función modificada para enviar mensaje WS al agregar un pedido
   function handleAddOrder(productName: string, price: number) {
     if (!selectedTableForService) return;
     const newOrder: Order = {
@@ -993,6 +994,21 @@ export default function POSSystem() {
     } else {
       addOrderToCurrentTable(newOrder);
       setCurrentOrder(newOrder);
+    }
+    // Enviar mensaje WS para notificar el nuevo pedido
+    if (stompClient && stompClient.connected) {
+      const payload = JSON.stringify({
+        type: 'ADD_ORDER',
+        tableId: selectedTableForService.id,
+        order: newOrder,
+      });
+      stompClient.publish({
+        destination: '/app/nuevo-pedido',
+        body: payload,
+      });
+      console.log('Mensaje WS enviado:', payload);
+    } else {
+      console.log('No conectado al WebSocket');
     }
   }
 
@@ -1325,7 +1341,7 @@ export default function POSSystem() {
   /* ============================================================
      NUEVA SECCIÓN: INTEGRACIÓN CON WEBSOCKET
      ============================================================ */
-  // Se muestra un botón para enviar un mensaje de prueba
+  // Se muestra un botón para enviar un mensaje de prueba vía WebSocket
   const sendTestWSMessage = () => {
     if (stompClient && stompClient.connected) {
       const mensaje = 'Nuevo pedido desde el cliente (prueba WS)';
