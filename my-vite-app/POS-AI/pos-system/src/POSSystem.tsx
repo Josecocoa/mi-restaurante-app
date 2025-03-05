@@ -569,7 +569,7 @@ function ServicioScreen({
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Pedidos Servidos</h1>
       {sortedDoneOrders.length === 0 ? (
-        <p className="text-gray-500">No hay pedidos servidos.</p>
+        <p className="text-gray-500">Tranqui tronco, ahora saldran los platos.</p>
       ) : (
         <div className="space-y-4">
           {sortedDoneOrders.map((item, idx) => (
