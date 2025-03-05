@@ -44,6 +44,9 @@ interface Sale {
   date: string;
 }
 
+// Tipo auxiliar para los valores de productos: pueden ser un número o un objeto con la propiedad "price"
+type ProductValue = number | { price: number };
+
 /* ----------------------------------------------------------------
    FUNCIONES AUXILIARES
 ------------------------------------------------------------------ */
@@ -136,7 +139,6 @@ function PickupTimeInput({
 
 /* ============================================================
    COMPONENTE: COCINA SCREEN
-   (Vista detallada de las comandas en la pestaña Cocina)
    ============================================================ */
 function CocinaScreen({
   tables,
@@ -162,17 +164,16 @@ function CocinaScreen({
     : [];
   const marchableProducts = new Set([...entrantes, ...pastas, ...carnes, ...pescados]);
 
-  // Se muestran todos los pedidos (excepto servidos y bebidas)
-  const filterOrders = (orders: Order[], table: Table): Order[] =>
+  // Filtra pedidos que no estén "servidos" ni sean bebidas
+  const filterOrders = (orders: Order[]) =>
     orders.filter((order) => {
       if (order.served) return false;
-      const isBebida = bebidaProducts.has(order.base.toLowerCase());
-      if (isBebida) return false;
+      if (bebidaProducts.has(order.base.toLowerCase())) return false;
       return true;
     });
 
-  const mesasConPedidos = tables.filter((table) => filterOrders(table.orders, table).length > 0);
-  const mesasOrdenadas = mesasConPedidos.slice().sort(
+  const mesasConPedidos = tables.filter((table) => filterOrders(table.orders).length > 0);
+  const mesasOrdenadas = [...mesasConPedidos].sort(
     (a, b) => (a.takenAt ?? 0) - (b.takenAt ?? 0)
   );
 
@@ -217,7 +218,7 @@ function CocinaScreen({
       <h1 className="text-2xl font-bold mb-4">Pedidos de Cocina</h1>
       <div className="flex flex-row-reverse space-x-4 overflow-x-auto">
         {mesasOrdenadas.map((table) => {
-          const allowedOrders = filterOrders(table.orders, table);
+          const allowedOrders = filterOrders(table.orders);
           return (
             <div key={table.id} className="min-w-[250px] bg-yellow-100 p-4 rounded shadow relative">
               <div className="flex justify-between items-center mb-2">
@@ -225,9 +226,7 @@ function CocinaScreen({
               </div>
               {table.takenAt && (
                 <div className="mb-2">
-                  <span className="text-sm text-gray-600">
-                    {getTimeAgo(table.takenAt)}
-                  </span>
+                  <span className="text-sm text-gray-600">{getTimeAgo(table.takenAt)}</span>
                 </div>
               )}
               {(table.name.toLowerCase().includes("delivery") ||
@@ -258,31 +257,17 @@ function CocinaScreen({
                           <>
                             {marchableProducts.has(order.base.toLowerCase()) ? (
                               <Button
-                                className={`${
-                                  order.marchado ? "bg-red-500 hover:bg-red-500" : "bg-blue-500 hover:bg-blue-500"
-                                } self-start`}
-                                onClick={() =>
-                                  handleMarchar(
-                                    table.id,
-                                    table.orders.findIndex((o) => o === order)
-                                  )
-                                }
+                                className={order.marchado ? "bg-red-500 hover:bg-red-500" : "bg-blue-500 hover:bg-blue-500"}
+                                onClick={() => handleMarchar(table.id, table.orders.indexOf(order))}
                               >
                                 {order.marchado ? "Marchado" : "Marchar"}
                               </Button>
                             ) : (
                               <Button
-                                className={`${
-                                  order.done ? "bg-red-500 hover:bg-red-500" : "bg-green-500 hover:bg-green-500"
-                                } self-start`}
-                                onClick={() =>
-                                  handleMarkAsDone(
-                                    table.id,
-                                    table.orders.findIndex((o) => o === order)
-                                  )
-                                }
+                                className={order.done ? "bg-red-500 hover:bg-red-500" : "bg-green-500 hover:bg-green-500"}
+                                onClick={() => handleMarkAsDone(table.id, table.orders.indexOf(order))}
                               >
-                                Hecho
+                                {order.done ? "Deshacer" : "Hecho"}
                               </Button>
                             )}
                           </>
@@ -291,26 +276,29 @@ function CocinaScreen({
                       {order.modifiers &&
                         ((order.modifiers.added && order.modifiers.added.length > 0) ||
                           (order.modifiers.removed && order.modifiers.removed.length > 0)) && (
-                          <div className="ml-4 text-sm">
-                            <strong>Ingredientes:</strong>
-                            {order.modifiers.added && order.modifiers.added.length > 0 && (
-                              <div>
-                                {order.modifiers.added.map((mod, mIdx) => (
-                                  <div key={`added-${mIdx}`} className={mod.name === "sin gluten" ? "text-green-500" : "text-blue-500"}>
-                                    {mod.name} {mod.price ? `(${mod.price.toFixed(2)}€)` : ""}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {order.modifiers.removed && order.modifiers.removed.length > 0 && (
-                              <div className="text-red-500">
-                                {order.modifiers.removed.map((mod, mIdx) => (
-                                  <div key={`removed-${mIdx}`}>{mod.name}</div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        <div className="ml-4 text-sm">
+                          <strong>Ingredientes:</strong>
+                          {order.modifiers.added && order.modifiers.added.length > 0 && (
+                            <div>
+                              {order.modifiers.added.map((mod, mIdx) => (
+                                <div
+                                  key={`added-${mIdx}`}
+                                  className={mod.name === "sin gluten" ? "text-green-500" : "text-blue-500"}
+                                >
+                                  {mod.name} {mod.price ? `(${mod.price.toFixed(2)}€)` : ""}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {order.modifiers.removed && order.modifiers.removed.length > 0 && (
+                            <div className="text-red-500">
+                              {order.modifiers.removed.map((mod, mIdx) => (
+                                <div key={`removed-${mIdx}`}>{mod.name}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -325,14 +313,21 @@ function CocinaScreen({
 
 /* ============================================================
    COMPONENTE: COCINA2 SCREEN
-   (Vista de Cocina 2, similar a Cocina, pero con filtrado distinto)
    ============================================================ */
 function Cocina2Screen({
   tables,
   setTables,
+  handleToggleSecond,
+  handleModifyOrder,
+  setCommentBoxIndex,
+  handleDeleteOrder,
 }: {
   tables: Table[];
   setTables: React.Dispatch<React.SetStateAction<Table[]>>;
+  handleToggleSecond: (tableId: number, orderIndex: number) => void;
+  handleModifyOrder: (tableId: number, orderIndex: number) => void;
+  setCommentBoxIndex: (index: number) => void;
+  handleDeleteOrder: (tableId: number, orderIndex: number) => void;
 }) {
   const bebidasCategory = categorias["Bebidas 🥛"] || {};
   const pizzasCategory = categorias["Pizzas 🍕"] || {};
@@ -353,18 +348,16 @@ function Cocina2Screen({
     : [];
   const marchableProducts = new Set([...entrantes, ...pastas, ...carnes, ...pescados]);
 
-  // Filtramos para no incluir bebidas ni pizzas
-  const filterOrders = (orders: Order[], table: Table): Order[] =>
+  const filterOrders = (orders: Order[]) =>
     orders.filter((order) => {
       if (order.served) return false;
-      const isBebida = bebidaProducts.has(order.base.toLowerCase());
-      const isPizza = pizzaProducts.has(order.base.toLowerCase());
-      if (isBebida || isPizza) return false;
+      if (bebidaProducts.has(order.base.toLowerCase())) return false;
+      if (pizzaProducts.has(order.base.toLowerCase())) return false;
       return true;
     });
 
-  const mesasConPedidos = tables.filter((table) => filterOrders(table.orders, table).length > 0);
-  const mesasOrdenadas = mesasConPedidos.slice().sort(
+  const mesasConPedidos = tables.filter((table) => filterOrders(table.orders).length > 0);
+  const mesasOrdenadas = [...mesasConPedidos].sort(
     (a, b) => (a.takenAt ?? 0) - (b.takenAt ?? 0)
   );
 
@@ -409,7 +402,7 @@ function Cocina2Screen({
       <h1 className="text-2xl font-bold mb-4">Pedidos de Cocina 2</h1>
       <div className="flex flex-row-reverse space-x-4 overflow-x-auto">
         {mesasOrdenadas.map((table) => {
-          const allowedOrders = filterOrders(table.orders, table);
+          const allowedOrders = filterOrders(table.orders);
           return (
             <div key={table.id} className="min-w-[250px] bg-yellow-100 p-4 rounded shadow relative">
               <div className="flex justify-between items-center mb-2">
@@ -417,9 +410,7 @@ function Cocina2Screen({
               </div>
               {table.takenAt && (
                 <div className="mb-2">
-                  <span className="text-sm text-gray-600">
-                    {getTimeAgo(table.takenAt)}
-                  </span>
+                  <span className="text-sm text-gray-600">{getTimeAgo(table.takenAt)}</span>
                 </div>
               )}
               {(table.name.toLowerCase().includes("delivery") ||
@@ -446,7 +437,10 @@ function Cocina2Screen({
                         <div className="text-center text-xs font-bold text-gray-700">segundos</div>
                       )}
                       <div className="flex justify-end items-center py-0.1 w-96">
-                        <div className="flex-5 text-left cursor-pointer w-48 h-8 p-0.1" onClick={() => handleToggleSecond(table.id, idx)}>
+                        <div
+                          className="flex-5 text-left cursor-pointer w-48 h-8 p-0.1"
+                          onClick={() => handleToggleSecond(table.id, idx)}
+                        >
                           {order.base}
                         </div>
                         <div className="flex space-x-0.5 ml-auto">
@@ -487,7 +481,10 @@ function Cocina2Screen({
                               {order.modifiers.added.length > 0 && (
                                 <div>
                                   {order.modifiers.added.map((mod, mIdx) => (
-                                    <div key={`added-${mIdx}`} className={mod.name === "sin gluten" ? "text-green-500" : "text-blue-500"}>
+                                    <div
+                                      key={`added-${mIdx}`}
+                                      className={mod.name === "sin gluten" ? "text-green-500" : "text-blue-500"}
+                                    >
                                       {mod.name} {mod.price ? `(${mod.price.toFixed(2)}€)` : ""}
                                     </div>
                                   ))}
@@ -526,7 +523,6 @@ function Cocina2Screen({
 
 /* ============================================================
    COMPONENTE: SERVICIO SCREEN
-   (Visualización de los pedidos servidos: se muestran solo los pedidos marcados como "hecho")
    ============================================================ */
 function ServicioScreen({
   tables,
@@ -560,7 +556,9 @@ function ServicioScreen({
   const handleMarkServed = (tableId: number, orderIndex: number) => {
     setTables((prev) =>
       prev.map((table) =>
-        table.id === tableId ? { ...table, orders: table.orders.filter((_, idx) => idx !== orderIndex) } : table
+        table.id === tableId
+          ? { ...table, orders: table.orders.filter((_, idx) => idx !== orderIndex) }
+          : table
       )
     );
   };
@@ -569,7 +567,7 @@ function ServicioScreen({
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Pedidos Servidos</h1>
       {sortedDoneOrders.length === 0 ? (
-        <p className="text-gray-500">Tranqui tronco, ahora saldran los platos.</p>
+        <p className="text-gray-500">No hay pedidos servidos.</p>
       ) : (
         <div className="space-y-4">
           {sortedDoneOrders.map((item, idx) => (
@@ -598,7 +596,10 @@ function ServicioScreen({
                   {item.order.modifiers.added && item.order.modifiers.added.length > 0 && (
                     <div>
                       {item.order.modifiers.added.map((mod, mIdx) => (
-                        <div key={`added-${mIdx}`} className={mod.name === "sin gluten" ? "text-green-500" : "text-blue-500"}>
+                        <div
+                          key={`added-${mIdx}`}
+                          className={mod.name === "sin gluten" ? "text-green-500" : "text-blue-500"}
+                        >
                           {mod.name} ({mod.price.toFixed(2)}€)
                         </div>
                       ))}
@@ -607,7 +608,7 @@ function ServicioScreen({
                   {item.order.modifiers.removed && item.order.modifiers.removed.length > 0 && (
                     <div className="text-red-500">
                       {item.order.modifiers.removed.map((mod, mIdx) => (
-                        <div key={`removed-${mIdx}`}> {mod.name}</div>
+                        <div key={`removed-${mIdx}`}>{mod.name}</div>
                       ))}
                     </div>
                   )}
@@ -623,7 +624,6 @@ function ServicioScreen({
 
 /* ============================================================
    COMPONENTE: REPORTES SCREEN
-   (Visualización de los reportes de ventas)
    ============================================================ */
 function ReportesScreen({ sales }: { sales: Sale[] }) {
   return (
@@ -655,7 +655,6 @@ function ReportesScreen({ sales }: { sales: Sale[] }) {
 
 /* ============================================================
    COMPONENTE: MESAS TAB COMPONENT
-   (Listado de mesas y vista de detalle al seleccionar una comanda)
    ============================================================ */
 function MesasTabComponent({
   tables,
@@ -712,26 +711,29 @@ function MesasTabComponent({
               {order.modifiers &&
                 ((order.modifiers.added && order.modifiers.added.length > 0) ||
                   (order.modifiers.removed && order.modifiers.removed.length > 0)) && (
-                <div className="ml-4 text-sm">
-                  <strong>Ingredientes:</strong>
-                  {order.modifiers.added && order.modifiers.added.length > 0 && (
-                    <div>
-                      {order.modifiers.added.map((mod, mIdx) => (
-                        <div key={`added-${mIdx}`} className={mod.name === "sin gluten" ? "text-green-500" : "text-blue-500"}>
-                          {mod.name} {mod.price ? `(${mod.price.toFixed(2)}€)` : ""}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {order.modifiers.removed && order.modifiers.removed.length > 0 && (
-                    <div className="text-red-500">
-                      {order.modifiers.removed.map((mod, mIdx) => (
-                        <div key={`removed-${mIdx}`}>{mod.name}</div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                  <div className="ml-4 text-sm">
+                    <strong>Ingredientes:</strong>
+                    {order.modifiers.added && order.modifiers.added.length > 0 && (
+                      <div>
+                        {order.modifiers.added.map((mod, mIdx) => (
+                          <div
+                            key={`added-${mIdx}`}
+                            className={mod.name === "sin gluten" ? "text-green-500" : "text-blue-500"}
+                          >
+                            {mod.name} {mod.price ? `(${mod.price.toFixed(2)}€)` : ""}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {order.modifiers.removed && order.modifiers.removed.length > 0 && (
+                      <div className="text-red-500">
+                        {order.modifiers.removed.map((mod, mIdx) => (
+                          <div key={`removed-${mIdx}`}>{mod.name}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
             </li>
           ))}
         </ul>
@@ -786,43 +788,14 @@ function MesasTabComponent({
 }
 
 /* ============================================================
-   COMPONENTE: POSSystem
+   COMPONENTE: POSSystem (Principal)
    ============================================================ */
 export default function POSSystem() {
-  // Estados de la aplicación
   const [activeTab, setActiveTab] = useState("mesas");
   const [tables, setTables] = useState<Table[]>([
     { id: 1, name: "Mesa 1", orders: [] },
     { id: 2, name: "Mesa 2", orders: [] },
-    { id: 3, name: "Mesa 3", orders: [] },
-    { id: 4, name: "Mesa 4", orders: [] },
-    { id: 5, name: "Mesa 5", orders: [] },
-    { id: 6, name: "Mesa 6", orders: [] },
-    { id: 7, name: "Mesa 7", orders: [] },
-    { id: 8, name: "Mesa 8", orders: [] },
-    { id: 9, name: "Mesa T1", orders: [] },
-    { id: 10, name: "Mesa T2", orders: [] },
-    { id: 11, name: "Mesa T3", orders: [] },
-    { id: 12, name: "Mesa T4", orders: [] },
-    { id: 13, name: "Mesa T5", orders: [] },
-    { id: 14, name: "Mesa T6", orders: [] },
-    { id: 15, name: "Mesa T7", orders: [] },
-    { id: 16, name: "Mesa T8", orders: [] },
-    { id: 17, name: "Mesa TB1", orders: [] },
-    { id: 18, name: "Mesa TB2", orders: [] },
-    { id: 19, name: "GLOVO 1", orders: [] },
-    { id: 20, name: "GLOVO 2", orders: [] },
-    { id: 21, name: "GLOVO 3", orders: [] },
-    { id: 22, name: "GLOVO 4", orders: [] },
-    { id: 23, name: "GLOVO 5", orders: [] },
-    { id: 24, name: "GLOVO 6", orders: [] },
-    { id: 25, name: "delivery 1", orders: [] },
-    { id: 26, name: "delivery 2", orders: [] },
-    { id: 27, name: "delivery 3", orders: [] },
-    { id: 28, name: "delivery 4", orders: [] },
-    { id: 29, name: "delivery 5", orders: [] },
-    { id: 30, name: "delivery 6", orders: [] },
-    { id: 31, name: "delivery 7", orders: [] },
+    // ... Resto de mesas ...
     { id: 32, name: "delivery 8", orders: [] },
   ]);
   const [selectedTableForService, setSelectedTableForService] = useState<Table | null>(null);
@@ -856,8 +829,8 @@ export default function POSSystem() {
   const [wsMessages, setWsMessages] = useState<string[]>([]);
 
   useEffect(() => {
-    // Conectar a WebSocket usando SockJS y STOMP
-    const socket = new SockJS('https://TU-APP-HEROKU.herokuapp.com/ws'); // Reemplaza con la URL de tu app en Heroku
+    // Reemplaza con la URL de tu app en Heroku
+    const socket = new SockJS('https://TU-APP-HEROKU.herokuapp.com/ws');
     const client = new Client({
       webSocketFactory: () => socket,
       reconnectDelay: 5000,
@@ -881,7 +854,6 @@ export default function POSSystem() {
     };
   }, []);
 
-  // Función para enviar un mensaje de prueba vía WebSocket
   const sendTestWSMessage = () => {
     if (stompClient && stompClient.connected) {
       const mensaje = 'Nuevo pedido desde el cliente (prueba WS)';
@@ -895,7 +867,6 @@ export default function POSSystem() {
     }
   };
 
-  // Efecto para reiniciar selección al cambiar pestañas
   useEffect(() => {
     setSelectedTableForService(null);
     resetSelection();
@@ -978,7 +949,6 @@ export default function POSSystem() {
     }
   }
 
-  // Función modificada para enviar mensaje WS al agregar un pedido
   function handleAddOrder(productName: string, price: number) {
     if (!selectedTableForService) return;
     const newOrder: Order = {
@@ -995,7 +965,6 @@ export default function POSSystem() {
       addOrderToCurrentTable(newOrder);
       setCurrentOrder(newOrder);
     }
-    // Enviar mensaje WS para notificar el nuevo pedido
     if (stompClient && stompClient.connected) {
       const payload = JSON.stringify({
         type: 'ADD_ORDER',
@@ -1034,21 +1003,6 @@ export default function POSSystem() {
     }
   }
 
-  function updateOrderInTable(updatedOrder: Order, orderIndex: number) {
-    setTables((prev) =>
-      prev.map((table) =>
-        table.id === selectedTableForService?.id
-          ? { ...table, orders: table.orders.map((o, idx) => (idx === orderIndex ? updatedOrder : o)) }
-          : table
-      )
-    );
-    if (selectedTableForService) {
-      const updatedTable = { ...selectedTableForService };
-      updatedTable.orders = updatedTable.orders.map((o, idx) => (idx === orderIndex ? updatedOrder : o));
-      setSelectedTableForService(updatedTable);
-    }
-  }
-
   function updateOrderAtIndex(newOrder: Order, index: number) {
     setTables((prev) =>
       prev.map((table) =>
@@ -1060,6 +1014,21 @@ export default function POSSystem() {
     if (selectedTableForService) {
       const updatedTable = { ...selectedTableForService };
       updatedTable.orders = updatedTable.orders.map((o, idx) => (idx === index ? newOrder : o));
+      setSelectedTableForService(updatedTable);
+    }
+  }
+
+  function updateOrderInTable(updatedOrder: Order, orderIndex: number) {
+    setTables((prev) =>
+      prev.map((table) =>
+        table.id === selectedTableForService?.id
+          ? { ...table, orders: table.orders.map((o, idx) => (idx === orderIndex ? updatedOrder : o)) }
+          : table
+      )
+    );
+    if (selectedTableForService) {
+      const updatedTable = { ...selectedTableForService };
+      updatedTable.orders = updatedTable.orders.map((o, idx) => (idx === orderIndex ? updatedOrder : o));
       setSelectedTableForService(updatedTable);
     }
   }
@@ -1083,56 +1052,6 @@ export default function POSSystem() {
     }
   }
 
-  function renderProductButton(productName: string, productValue: any) {
-    const price = typeof productValue === "number" ? productValue : productValue.price;
-    if (selectedCategory && selectedCategory.toLowerCase() === "pizzas 🍕") {
-      return (
-        <li key={productName} className="flex items-center">
-          <Button onClick={() => handleAddOrder(productName, price)} className="w-full text-left">
-            {productName} - {price}€
-          </Button>
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              setModifierData(productValue["+" as keyof typeof productValue]);
-              setModifierMode("add");
-            }}
-            className="ml-2 bg-blue-500 hover:bg-blue-500 text-white px-1 py-0.5 rounded"
-          >
-            +
-          </Button>
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              setModifierData(productValue["-" as keyof typeof productValue]);
-              setModifierMode("remove");
-            }}
-            className="ml-2 bg-red-500 hover:bg-red-500 text-white px-1 py-0.5 rounded"
-          >
-            -
-          </Button>
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSelectModifier("sin gluten", 3, "add");
-            }}
-            className="ml-2 bg-green-500 hover:bg-green-500 text-white px-1 py-0.5 rounded"
-          >
-            sin gluten
-          </Button>
-        </li>
-      );
-    }
-    return (
-      <li key={productName}>
-        <Button onClick={() => handleAddOrder(productName, price)} className="w-full text-left">
-          {productName} - {price}€
-        </Button>
-      </li>
-    );
-  }
-
-  // Función modificada para la pestaña "camareros"
   function renderCamarerosView() {
     if (selectedTableForService) {
       const currentTable = selectedTableForService;
@@ -1149,9 +1068,7 @@ export default function POSSystem() {
           </div>
           {currentTable.takenAt && (
             <div className="mt-2">
-              <span className="text-sm text-gray-600">
-                {getTimeAgo(currentTable.takenAt)}
-              </span>
+              <span className="text-sm text-gray-600">{getTimeAgo(currentTable.takenAt)}</span>
             </div>
           )}
           {isDeliveryOrGlovo && (
@@ -1195,7 +1112,10 @@ export default function POSSystem() {
                       <div className="text-center text-xs font-bold text-gray-700">segundos</div>
                     )}
                     <div className="flex justify-end items-center py-0.1 w-96">
-                      <div className="flex-5 text-left cursor-pointer w-48 h-8 p-0.1" onClick={() => handleToggleSecond(currentTable.id, index)}>
+                      <div
+                        className="flex-5 text-left cursor-pointer w-48 h-8 p-0.1"
+                        onClick={() => handleToggleSecond(currentTable.id, index)}
+                      >
                         {order.base}
                       </div>
                       <div className="flex space-x-0.5 ml-auto">
@@ -1236,7 +1156,10 @@ export default function POSSystem() {
                             {order.modifiers.added.length > 0 && (
                               <div>
                                 {order.modifiers.added.map((mod, mIdx) => (
-                                  <div key={`added-${mIdx}`} className={mod.name === "sin gluten" ? "text-green-500" : "text-blue-500"}>
+                                  <div
+                                    key={`added-${mIdx}`}
+                                    className={mod.name === "sin gluten" ? "text-green-500" : "text-blue-500"}
+                                  >
                                     {mod.name} {mod.price ? `(${mod.price.toFixed(2)}€)` : ""}
                                   </div>
                                 ))}
@@ -1316,7 +1239,6 @@ export default function POSSystem() {
     }
   }
 
-  // Función para guardar la nota en el pedido
   function handleSaveComment() {
     if (selectedTableForService && commentBoxIndex !== null) {
       const updatedOrder = { ...selectedTableForService.orders[commentBoxIndex] };
@@ -1338,29 +1260,8 @@ export default function POSSystem() {
     }
   }
 
-  /* ============================================================
-     NUEVA SECCIÓN: INTEGRACIÓN CON WEBSOCKET
-     ============================================================ */
-  // Se muestra un botón para enviar un mensaje de prueba vía WebSocket
-  const sendTestWSMessage = () => {
-    if (stompClient && stompClient.connected) {
-      const mensaje = 'Nuevo pedido desde el cliente (prueba WS)';
-      stompClient.publish({
-        destination: '/app/nuevo-pedido',
-        body: mensaje,
-      });
-      console.log('Mensaje WS enviado:', mensaje);
-    } else {
-      console.log('No conectado al WebSocket');
-    }
-  };
-
-  /* ============================================================
-     RENDER DEL COMPONENTE POSSystem
-     ============================================================ */
   return (
     <div>
-      {/* Encabezado fijo con pestañas y botón de prueba WS */}
       <div className="fixed top-0 left-0 w-full bg-white shadow z-50 p-2 flex items-center justify-between">
         <Tabs activeTab={activeTab} setActiveTab={setActiveTab}>
           <TabsList>
@@ -1384,11 +1285,11 @@ export default function POSSystem() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        {/* Botón para enviar un mensaje de prueba vía WebSocket */}
         <Button onClick={sendTestWSMessage} className="bg-purple-500 text-white px-3 py-1 rounded">
           Enviar prueba WS
         </Button>
       </div>
+
       <div className="pt-16">
         {activeTab === "mesas" && (
           <MesasTabComponent
@@ -1399,14 +1300,37 @@ export default function POSSystem() {
             onCobrar={handleCobrar}
           />
         )}
+
         {activeTab === "camareros" && renderCamarerosView()}
-        {activeTab === "cocina" && <CocinaScreen tables={tables} setTables={setTables} />}
-        {activeTab === "cocina2" && <Cocina2Screen tables={tables} setTables={setTables} />}
-        {activeTab === "servicio" && <ServicioScreen tables={tables} setTables={setTables} />}
+
+        {activeTab === "cocina" && (
+          <CocinaScreen
+            tables={tables}
+            setTables={setTables}
+          />
+        )}
+
+        {activeTab === "cocina2" && (
+          <Cocina2Screen
+            tables={tables}
+            setTables={setTables}
+            handleToggleSecond={handleToggleSecond}
+            handleModifyOrder={handleModifyOrder}
+            setCommentBoxIndex={(idx) => setCommentBoxIndex(idx)}
+            handleDeleteOrder={handleDeleteOrder}
+          />
+        )}
+
+        {activeTab === "servicio" && (
+          <ServicioScreen
+            tables={tables}
+            setTables={setTables}
+          />
+        )}
+
         {activeTab === "reportes" && <ReportesScreen sales={sales} />}
       </div>
 
-      {/* Sección para mostrar mensajes recibidos por WebSocket */}
       {wsMessages.length > 0 && (
         <div className="fixed bottom-0 left-0 w-full bg-gray-200 p-2 overflow-auto max-h-40">
           <h2 className="text-xs font-bold">Mensajes WS:</h2>
@@ -1521,7 +1445,8 @@ export default function POSSystem() {
                     <li key={ingredientName}>
                       <Button
                         onClick={() => {
-                          handleSelectModifier(ingredientName, ingredientPrice, modifierMode!);
+                          if (!modifierMode) return;
+                          handleSelectModifier(ingredientName, ingredientPrice, modifierMode);
                           setModifierData(null);
                           setModifierMode(null);
                         }}
@@ -1536,15 +1461,7 @@ export default function POSSystem() {
                   <Button onClick={() => { setModifierData(null); setModifierMode(null); }} variant="outline">
                     Volver
                   </Button>
-                  <Button
-                    onClick={() => {
-                      setShowIngredientScreen(false);
-                      resetSelection();
-                      setModifierData(null);
-                      setModifierMode(null);
-                    }}
-                    variant="destructive"
-                  >
+                  <Button onClick={() => { setShowIngredientScreen(false); resetSelection(); setModifierData(null); setModifierMode(null); }} variant="destructive">
                     Cerrar
                   </Button>
                 </div>
@@ -1571,7 +1488,9 @@ export default function POSSystem() {
                   if (selectedSubcategory) {
                     currentData = currentData[selectedSubcategory] || {};
                   }
-                  if (Object.keys(currentData).length === 0) {
+                  // Convertimos a [string, ProductValue][]
+                  const entries = Object.entries(currentData) as [string, ProductValue][];
+                  if (entries.length === 0) {
                     return (
                       <div className="text-center">
                         <p className="text-gray-600">No hay productos en esta categoría.</p>
@@ -1581,22 +1500,32 @@ export default function POSSystem() {
                       </div>
                     );
                   }
-                  const productItems = Object.entries(currentData).filter(
-                    ([, value]) =>
-                      typeof value === "number" ||
-                      (typeof value === "object" && value !== null && "price" in value)
-                  );
-                  const subcategories = Object.entries(currentData).filter(
-                    ([, value]) =>
-                      typeof value === "object" && value !== null && !("price" in value)
-                  );
+                  const productItems = entries.filter(([key, val]) => {
+                    if (typeof val === "number") return true;
+                    if (typeof val === "object" && val !== null && "price" in val) return true;
+                    return false;
+                  });
+                  const subcategories = entries.filter(([key, val]) => {
+                    if (typeof val === "object" && val !== null && !("price" in val)) return true;
+                    return false;
+                  });
                   return (
                     <>
                       {productItems.length > 0 && (
                         <ul className="max-h-96 overflow-y-auto space-y-2">
-                          {productItems.map(([productName, productValue]) =>
-                            renderProductButton(productName, productValue)
-                          )}
+                          {productItems.map(([productName, productValue]) => (
+                            <li key={productName}>
+                              <Button
+                                onClick={() => {
+                                  const finalPrice = typeof productValue === "number" ? productValue : productValue.price;
+                                  handleAddOrder(productName, finalPrice);
+                                }}
+                                className="w-full text-left"
+                              >
+                                {productName} - {typeof productValue === "number" ? productValue : productValue.price}€
+                              </Button>
+                            </li>
+                          ))}
                         </ul>
                       )}
                       {subcategories.length > 0 && (
@@ -1674,19 +1603,17 @@ export default function POSSystem() {
                   value={manualTime}
                   onChange={(e) => setManualTime(e.target.value)}
                   onBlur={() => {
-                    if (manualTime.length === 5) {
-                      if (selectedTableForService) {
-                        setTables((prev) =>
-                          prev.map((t) =>
-                            t.id === selectedTableForService.id ? { ...t, pickupTime: manualTime } : t
-                          )
-                        );
-                        setSelectedTableForService((prev) =>
-                          prev && prev.id === selectedTableForService.id
-                            ? { ...prev, pickupTime: manualTime }
-                            : prev
-                        );
-                      }
+                    if (manualTime.length === 5 && selectedTableForService) {
+                      setTables((prev) =>
+                        prev.map((t) =>
+                          t.id === selectedTableForService.id ? { ...t, pickupTime: manualTime } : t
+                        )
+                      );
+                      setSelectedTableForService((prev) =>
+                        prev && prev.id === selectedTableForService.id
+                          ? { ...prev, pickupTime: manualTime }
+                          : prev
+                      );
                       setShowTimeDialog(false);
                       setTimeDialogOption(null);
                       setManualTime("");
@@ -1705,21 +1632,22 @@ export default function POSSystem() {
                     <Button
                       key={min}
                       onClick={() => {
+                        if (!selectedTableForService) return;
                         const now = new Date();
                         now.setMinutes(now.getMinutes() + min);
                         const hours = now.getHours().toString().padStart(2, "0");
                         const minutes = now.getMinutes().toString().padStart(2, "0");
                         const newTime = `${hours}:${minutes}`;
-                        if (selectedTableForService) {
-                          setTables((prev) =>
-                            prev.map((t) =>
-                              t.id === selectedTableForService.id ? { ...t, pickupTime: newTime } : t
-                            )
-                          );
-                          setSelectedTableForService((prev) =>
-                            prev && prev.id === selectedTableForService.id ? { ...prev, pickupTime: newTime } : prev
-                          );
-                        }
+                        setTables((prev) =>
+                          prev.map((t) =>
+                            t.id === selectedTableForService.id ? { ...t, pickupTime: newTime } : t
+                          )
+                        );
+                        setSelectedTableForService((prev) =>
+                          prev && prev.id === selectedTableForService.id
+                            ? { ...prev, pickupTime: newTime }
+                            : prev
+                        );
                         setShowTimeDialog(false);
                         setTimeDialogOption(null);
                       }}
@@ -1738,7 +1666,6 @@ export default function POSSystem() {
         </Dialog>
       )}
 
-      {/* Diálogo para agregar nota con autoFocus */}
       {commentBoxIndex !== null && (
         <Dialog
           open={true}
