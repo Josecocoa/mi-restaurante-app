@@ -4,6 +4,8 @@ import { Card, CardContent } from "./components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
 import { categorias } from "./modules/categorias/categories";
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 
 /* ============================================================
    TIPOS E INTERFACES
@@ -143,7 +145,6 @@ function CocinaScreen({
   tables: Table[];
   setTables: React.Dispatch<React.SetStateAction<Table[]>>;
 }) {
-  // Se utiliza solo la clave con mayúsculas
   const bebidasCategory = categorias["Bebidas 🥛"] || {};
   const bebidaProducts = new Set(getAllProductsFromCategory(bebidasCategory));
 
@@ -440,47 +441,77 @@ function Cocina2Screen({
                 {allowedOrders.map((order, idx) => {
                   const isSpecial = (!table.pedirSegundos && order.isSecond) || (marchableProducts.has(order.base.toLowerCase()) && !order.marchado);
                   return (
-                    <li key={idx} className="border-b pb-1">
-                      <div className="flex items-center justify-between">
-                        <div className={isSpecial ? "text-gray-400" : (order.done ? "line-through" : "")}>
+                    <li key={idx} className="border-b pb-2 w-full">
+                      {order.isSecond && (
+                        <div className="text-center text-xs font-bold text-gray-700">segundos</div>
+                      )}
+                      <div className="flex justify-end items-center py-0.1 w-96">
+                        <div className="flex-5 text-left cursor-pointer w-48 h-8 p-0.1" onClick={() => handleToggleSecond(table.id, idx)}>
                           {order.base}
                         </div>
-                        {!isSpecial && (
+                        <div className="flex space-x-0.5 ml-auto">
                           <Button
-                            className={`${
-                              order.done ? "bg-red-500 hover:bg-red-500" : "bg-green-500 hover:bg-green-500"
-                            } self-start`}
-                            onClick={() =>
-                              handleMarkAsDone(table.id, table.orders.findIndex((o) => o === order))
-                            }
+                            className="bg-blue-500 text-white px-0.75 py-0.25 text-xs rounded"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleModifyOrder(table.id, idx);
+                            }}
                           >
-                            Hecho
+                            edit
                           </Button>
-                        )}
+                          <Button
+                            className="bg-orange-400 text-white px-2 py-1 text-xs rounded"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCommentBoxIndex(idx);
+                            }}
+                          >
+                            nota
+                          </Button>
+                          <Button
+                            className="bg-red-500 text-white px-2 py-1 text-xs rounded"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteOrder(table.id, idx);
+                            }}
+                          >
+                            X
+                          </Button>
+                        </div>
                       </div>
-                      {order.modifiers &&
-                        ((order.modifiers.added && order.modifiers.added.length > 0) ||
-                          (order.modifiers.removed && order.modifiers.removed.length > 0)) && (
-                          <div className="ml-4 text-sm">
-                            <strong>Ingredientes:</strong>
-                            {order.modifiers.added && order.modifiers.added.length > 0 && (
-                              <div>
-                                {order.modifiers.added.map((mod, mIdx) => (
-                                  <div key={`added-${mIdx}`} className={mod.name === "sin gluten" ? "text-green-500" : "text-blue-500"}>
-                                    {mod.name} {mod.price ? `(${mod.price.toFixed(2)}€)` : ""}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {order.modifiers.removed && order.modifiers.removed.length > 0 && (
-                              <div className="text-red-500">
-                                {order.modifiers.removed.map((mod, mIdx) => (
-                                  <div key={`removed-${mIdx}`}>{mod.name}</div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                      {order.modifiers && (
+                        <div className="ml-4 text-sm space-y-1">
+                          {(order.modifiers.added.length > 0 || order.modifiers.removed.length > 0) && (
+                            <div>
+                              <strong>Ingredientes:</strong>
+                              {order.modifiers.added.length > 0 && (
+                                <div>
+                                  {order.modifiers.added.map((mod, mIdx) => (
+                                    <div key={`added-${mIdx}`} className={mod.name === "sin gluten" ? "text-green-500" : "text-blue-500"}>
+                                      {mod.name} {mod.price ? `(${mod.price.toFixed(2)}€)` : ""}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {order.modifiers.removed.length > 0 && (
+                                <div className="text-red-500">
+                                  {order.modifiers.removed.map((mod, mIdx) => (
+                                    <div key={`removed-${mIdx}`}>{mod.name}</div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {order.comments && order.comments.length > 0 && (
+                            <div className="mt-1">
+                              <strong>Notas adicionales:</strong>
+                              {order.comments.map((comment, cIdx) => (
+                                <div key={`comment-${cIdx}`}>{comment}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -529,14 +560,7 @@ function ServicioScreen({
   const handleMarkServed = (tableId: number, orderIndex: number) => {
     setTables((prev) =>
       prev.map((table) =>
-        table.id === tableId
-          ? {
-              ...table,
-              orders: table.orders.map((order, idx) =>
-                idx === orderIndex ? { ...order, served: true } : order
-              ),
-            }
-          : table
+        table.id === tableId ? { ...table, orders: table.orders.filter((_, idx) => idx !== orderIndex) } : table
       )
     );
   };
@@ -669,7 +693,7 @@ function MesasTabComponent({
 
   if (selectedTableForService) {
     const table = selectedTableForService;
-    const total = table.orders.reduce((acc, order) => acc + order.priceBase, 0);
+    const total = table.orders.reduce((acc, o) => acc + o.priceBase, 0);
     return (
       <div className="p-4">
         <div className="flex justify-between items-center mb-4">
@@ -687,8 +711,8 @@ function MesasTabComponent({
               </div>
               {order.modifiers &&
                 ((order.modifiers.added && order.modifiers.added.length > 0) ||
-                 (order.modifiers.removed && order.modifiers.removed.length > 0)) && (
-                <div className="mt-2 text-sm">
+                  (order.modifiers.removed && order.modifiers.removed.length > 0)) && (
+                <div className="ml-4 text-sm">
                   <strong>Ingredientes:</strong>
                   {order.modifiers.added && order.modifiers.added.length > 0 && (
                     <div>
@@ -727,43 +751,36 @@ function MesasTabComponent({
   const occupiedTables = tables.filter((table) => table.orders.length > 0);
   return (
     <div className="p-2">
-      {occupiedTables.length > 0 ? (
-        <div className="grid grid-cols-6 gap-2">
-          {occupiedTables.map((table) => {
-            const { bgClass, textClass } = getTableClassesForGeneral(table);
-            const total = table.orders.reduce((acc, o) => acc + o.priceBase, 0);
-            return (
-              <div key={table.id} className={`w-full h-full ${bgClass}`}>
-                <Card
-                  className="cursor-pointer hover:shadow-lg transform transition bg-transparent h-full relative"
-                  style={{ backgroundColor: "transparent" }}
-                  onClick={() => setSelectedTableForService(table)}
-                >
-                  {table.orders.some((order) => order.isSecond && !table.pedirSegundos) && (
-                    <div className="absolute top-0 right-0 w-5 h-5 bg-red-500 rounded-full"></div>
+      <div className="grid grid-cols-6 gap-2">
+        {tables.map((table) => {
+          const { bgClass, textClass } = getTableClassesForGeneral(table);
+          const total = table.orders.reduce((acc, o) => acc + o.priceBase, 0);
+          return (
+            <div key={table.id} className={`w-full h-full ${bgClass}`}>
+              <Card
+                className="cursor-pointer hover:shadow-lg transform transition bg-transparent h-full relative"
+                style={{ backgroundColor: "transparent" }}
+                onClick={() => setSelectedTableForService(table)}
+              >
+                <CardContent className="p-2 bg-transparent h-full" style={{ backgroundColor: "transparent" }}>
+                  <h2 className={textClass}>{table.name}</h2>
+                  {table.orders.length > 0 ? (
+                    <p className="text-lg font-bold">Total: {total.toFixed(2)}€</p>
+                  ) : (
+                    <p className="text-lg font-bold">Libre</p>
                   )}
-                  <CardContent className="p-2 bg-transparent h-full" style={{ backgroundColor: "transparent" }}>
-                    <h2 className={textClass}>{table.name}</h2>
-                    {table.orders.length > 0 ? (
-                      <p className="text-lg font-bold">Total: {total.toFixed(2)}€</p>
-                    ) : (
-                      <p className="text-lg font-bold">Libre</p>
-                    )}
-                    {(table.notes || table.pickupTime) && (
-                      <div className="mt-1 space-y-1">
-                        {table.notes && <p className="text-lg font-bold">{table.notes}</p>}
-                        {table.pickupTime && <p className="text-lg font-bold">{table.pickupTime}</p>}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="text-center text-gray-500">No hay mesas.</p>
-      )}
+                  {(table.notes || table.pickupTime) && (
+                    <div className="mt-1 space-y-1">
+                      {table.notes && <p className="text-lg font-bold">{table.notes}</p>}
+                      {table.pickupTime && <p className="text-lg font-bold">{table.pickupTime}</p>}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -772,6 +789,7 @@ function MesasTabComponent({
    COMPONENTE: POSSystem
    ============================================================ */
 export default function POSSystem() {
+  // Estados de la aplicación
   const [activeTab, setActiveTab] = useState("mesas");
   const [tables, setTables] = useState<Table[]>([
     { id: 1, name: "Mesa 1", orders: [] },
@@ -833,35 +851,51 @@ export default function POSSystem() {
   const [manualTime, setManualTime] = useState("");
   const prepOptions = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
 
-  // Mapa de flags para evitar reproducir el sonido más de una vez por mesa
-  const soundPlayedMap = useRef<Record<number, boolean>>({});
-  const soundTimeoutMap = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  // Estados y efectos para WebSocket
+  const [stompClient, setStompClient] = useState<Client | null>(null);
+  const [wsMessages, setWsMessages] = useState<string[]>([]);
 
-  // Efecto que revisa todas las mesas cuando activeTab es camareros, cocina o cocina2
   useEffect(() => {
-    if (["camareros", "cocina", "cocina2"].includes(activeTab)) {
-      tables.forEach((table) => {
-        if (table.orders.length > 0) {
-          if (!soundPlayedMap.current[table.id] && !soundTimeoutMap.current[table.id]) {
-            soundTimeoutMap.current[table.id] = setTimeout(() => {
-              const audio = new Audio("/alert.mp3");
-              audio.play();
-              soundPlayedMap.current[table.id] = true;
-              delete soundTimeoutMap.current[table.id];
-            }, 30000);
-          }
-        } else {
-          // Si la mesa no tiene pedidos, reseteamos el flag y cancelamos timer si existe
-          if (soundTimeoutMap.current[table.id]) {
-            clearTimeout(soundTimeoutMap.current[table.id]);
-            delete soundTimeoutMap.current[table.id];
-          }
-          soundPlayedMap.current[table.id] = false;
-        }
-      });
-    }
-  }, [activeTab, tables]);
+    // Conectar a WebSocket usando SockJS y STOMP
+    const socket = new SockJS('https://TU-APP-HEROKU.herokuapp.com/ws'); // Reemplaza con la URL de tu app en Heroku
+    const client = new Client({
+      webSocketFactory: () => socket,
+      reconnectDelay: 5000,
+      onConnect: () => {
+        console.log('Conectado al WebSocket');
+        client.subscribe('/topic/pedidos', (message) => {
+          const mensajeRecibido = message.body;
+          console.log('Mensaje WS recibido:', mensajeRecibido);
+          setWsMessages((prev) => [...prev, mensajeRecibido]);
+        });
+      },
+      onStompError: (frame) => {
+        console.error('Error en STOMP: ', frame.headers['message']);
+      },
+    });
+    client.activate();
+    setStompClient(client);
 
+    return () => {
+      client.deactivate();
+    };
+  }, []);
+
+  // Función para enviar un mensaje de prueba vía WebSocket
+  const sendTestWSMessage = () => {
+    if (stompClient && stompClient.connected) {
+      const mensaje = 'Nuevo pedido desde el cliente (prueba WS)';
+      stompClient.publish({
+        destination: '/app/nuevo-pedido',
+        body: mensaje,
+      });
+      console.log('Mensaje WS enviado:', mensaje);
+    } else {
+      console.log('No conectado al WebSocket');
+    }
+  };
+
+  // Efecto para reiniciar selección al cambiar pestañas
   useEffect(() => {
     setSelectedTableForService(null);
     resetSelection();
@@ -1218,34 +1252,9 @@ export default function POSSystem() {
           ) : (
             <p className="text-gray-500 mt-2">No hay pedidos en esta mesa.</p>
           )}
-          <div className="text-right font-bold text-lg mt-2">
-            Total: {currentTable.orders.reduce((acc, o) => acc + o.priceBase, 0).toFixed(2)}€
-          </div>
-          {currentTable.orders.some((order) => order.isSecond) && (
-            <div className="flex gap-2 mt-4">
-              <Button
-                className={`flex-1 ${
-                  currentTable.pedirSegundos ? "!bg-red-500 !text-white" : "!bg-orange-300 !text-black"
-                } !font-bold py-2 px-4 rounded-md`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setTables((prev) =>
-                    prev.map((tb) =>
-                      tb.id === currentTable.id ? { ...tb, pedirSegundos: !tb.pedirSegundos } : tb
-                    )
-                  );
-                  setSelectedTableForService((prev) =>
-                    prev && prev.id === currentTable.id ? { ...prev, pedirSegundos: !prev.pedirSegundos } : prev
-                  );
-                }}
-              >
-                {currentTable.pedirSegundos ? "Segundos pedidos" : "Pedir Segundos"}
-              </Button>
-            </div>
-          )}
           <div className="flex justify-end items-center">
             <Button
-              className="flex-2 bg-green-500 text-white font-bold py-0.5 px-1 text-3xl rounded-3xl"
+              className="flex-1 bg-green-500 text-white font-bold py-2 px-4 rounded-3xl"
               onClick={() => {
                 setSelectedCategory(null);
                 setSelectedSubcategory(null);
@@ -1256,42 +1265,6 @@ export default function POSSystem() {
             >
               +
             </Button>
-          </div>
-        </div>
-      );
-    } else {
-      // Cuando no hay mesa seleccionada, mostramos el listado de mesas para poder seleccionar.
-      return (
-        <div className="p-2">
-          <div className="grid grid-cols-6 gap-2">
-            {tables.map((table) => {
-              const { bgClass, textClass } = getTableClassesForGeneral(table);
-              const total = table.orders.reduce((acc, o) => acc + o.priceBase, 0);
-              return (
-                <div key={table.id} className={`w-full h-full ${bgClass}`}>
-                  <Card
-                    className="cursor-pointer hover:shadow-lg transform transition bg-transparent h-full relative"
-                    style={{ backgroundColor: "transparent" }}
-                    onClick={() => setSelectedTableForService(table)}
-                  >
-                    <CardContent className="p-2 bg-transparent h-full" style={{ backgroundColor: "transparent" }}>
-                      <h2 className={textClass}>{table.name}</h2>
-                      {table.orders.length > 0 ? (
-                        <p className="text-lg font-bold">Total: {total.toFixed(2)}€</p>
-                      ) : (
-                        <p className="text-lg font-bold">Libre</p>
-                      )}
-                      {(table.notes || table.pickupTime) && (
-                        <div className="mt-1 space-y-1">
-                          {table.notes && <p className="text-lg font-bold">{table.notes}</p>}
-                          {table.pickupTime && <p className="text-lg font-bold">{table.pickupTime}</p>}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-              );
-            })}
           </div>
         </div>
       );
@@ -1349,9 +1322,30 @@ export default function POSSystem() {
     }
   }
 
+  /* ============================================================
+     NUEVA SECCIÓN: INTEGRACIÓN CON WEBSOCKET
+     ============================================================ */
+  // Se muestra un botón para enviar un mensaje de prueba
+  const sendTestWSMessage = () => {
+    if (stompClient && stompClient.connected) {
+      const mensaje = 'Nuevo pedido desde el cliente (prueba WS)';
+      stompClient.publish({
+        destination: '/app/nuevo-pedido',
+        body: mensaje,
+      });
+      console.log('Mensaje WS enviado:', mensaje);
+    } else {
+      console.log('No conectado al WebSocket');
+    }
+  };
+
+  /* ============================================================
+     RENDER DEL COMPONENTE POSSystem
+     ============================================================ */
   return (
     <div>
-      <div className="fixed top-0 left-0 w-full bg-white shadow z-50">
+      {/* Encabezado fijo con pestañas y botón de prueba WS */}
+      <div className="fixed top-0 left-0 w-full bg-white shadow z-50 p-2 flex items-center justify-between">
         <Tabs activeTab={activeTab} setActiveTab={setActiveTab}>
           <TabsList>
             <TabsTrigger value="mesas" activeTab={activeTab} setActiveTab={setActiveTab}>
@@ -1374,6 +1368,10 @@ export default function POSSystem() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
+        {/* Botón para enviar un mensaje de prueba vía WebSocket */}
+        <Button onClick={sendTestWSMessage} className="bg-purple-500 text-white px-3 py-1 rounded">
+          Enviar prueba WS
+        </Button>
       </div>
       <div className="pt-16">
         {activeTab === "mesas" && (
@@ -1391,6 +1389,18 @@ export default function POSSystem() {
         {activeTab === "servicio" && <ServicioScreen tables={tables} setTables={setTables} />}
         {activeTab === "reportes" && <ReportesScreen sales={sales} />}
       </div>
+
+      {/* Sección para mostrar mensajes recibidos por WebSocket */}
+      {wsMessages.length > 0 && (
+        <div className="fixed bottom-0 left-0 w-full bg-gray-200 p-2 overflow-auto max-h-40">
+          <h2 className="text-xs font-bold">Mensajes WS:</h2>
+          <ul>
+            {wsMessages.map((msg, idx) => (
+              <li key={idx} className="text-xs">{msg}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {showCobrarDialog && (
         <Dialog open={showCobrarDialog} onOpenChange={(isOpen) => setShowCobrarDialog(isOpen)}>
@@ -1541,7 +1551,6 @@ export default function POSSystem() {
             ) : (
               <>
                 {(() => {
-                  // Aquí forzamos que se use la clave tal como está, usando un cast a any
                   let currentData = (categorias as any)[selectedCategory];
                   if (selectedSubcategory) {
                     currentData = currentData[selectedSubcategory] || {};
