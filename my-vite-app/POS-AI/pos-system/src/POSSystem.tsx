@@ -606,7 +606,7 @@ function ReportesScreen({ sales }: { sales: Sale[] }) {
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Reportes</h1>
       {sales.length === 0 ? (
-        <p className="text-gray-500">Vaya, aun no ha venido ninguna mesa.</p>
+        <p className="text-gray-500">vaya, aun no ha venido ninguna mesa.</p>
       ) : (
         <div className="space-y-4">
           {sales.map((sale) => (
