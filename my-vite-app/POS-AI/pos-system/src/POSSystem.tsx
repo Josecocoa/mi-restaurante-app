@@ -606,7 +606,7 @@ function ReportesScreen({ sales }: { sales: Sale[] }) {
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Reportes</h1>
       {sales.length === 0 ? (
-        <p className="text-gray-500">No hay reportes disponibles.</p>
+        <p className="text-gray-500">Vaya, aun no ha venido ninguna mesa.</p>
       ) : (
         <div className="space-y-4">
           {sales.map((sale) => (
@@ -1082,6 +1082,7 @@ export default function POSSystem() {
     );
   }
 
+  // Función modificada para la pestaña "camareros"
   function renderCamarerosView() {
     if (selectedTableForService) {
       const currentTable = selectedTableForService;
@@ -1255,6 +1256,42 @@ export default function POSSystem() {
             >
               +
             </Button>
+          </div>
+        </div>
+      );
+    } else {
+      // Cuando no hay mesa seleccionada, mostramos el listado de mesas para poder seleccionar.
+      return (
+        <div className="p-2">
+          <div className="grid grid-cols-6 gap-2">
+            {tables.map((table) => {
+              const { bgClass, textClass } = getTableClassesForGeneral(table);
+              const total = table.orders.reduce((acc, o) => acc + o.priceBase, 0);
+              return (
+                <div key={table.id} className={`w-full h-full ${bgClass}`}>
+                  <Card
+                    className="cursor-pointer hover:shadow-lg transform transition bg-transparent h-full relative"
+                    style={{ backgroundColor: "transparent" }}
+                    onClick={() => setSelectedTableForService(table)}
+                  >
+                    <CardContent className="p-2 bg-transparent h-full" style={{ backgroundColor: "transparent" }}>
+                      <h2 className={textClass}>{table.name}</h2>
+                      {table.orders.length > 0 ? (
+                        <p className="text-lg font-bold">Total: {total.toFixed(2)}€</p>
+                      ) : (
+                        <p className="text-lg font-bold">Libre</p>
+                      )}
+                      {(table.notes || table.pickupTime) && (
+                        <div className="mt-1 space-y-1">
+                          {table.notes && <p className="text-lg font-bold">{table.notes}</p>}
+                          {table.pickupTime && <p className="text-lg font-bold">{table.pickupTime}</p>}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })}
           </div>
         </div>
       );
