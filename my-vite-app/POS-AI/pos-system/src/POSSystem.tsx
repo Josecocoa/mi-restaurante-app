@@ -567,7 +567,7 @@ function ServicioScreen({
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Pedidos Servidos</h1>
       {sortedDoneOrders.length === 0 ? (
-        <p className="text-gray-500">No hay pedidos servidos.</p>
+        <p className="text-gray-500">Tranqui, ahora salen los pedidos.</p>
       ) : (
         <div className="space-y-4">
           {sortedDoneOrders.map((item, idx) => (
@@ -830,7 +830,7 @@ export default function POSSystem() {
 
   useEffect(() => {
     // Reemplaza con la URL de tu app en Heroku
-    const socket = new SockJS('https://TU-APP-HEROKU.herokuapp.com/ws');
+    const socket = new SockJS('https://cocoapossystem-5ddefe7ae380.herokuapp.com');
     const client = new Client({
       webSocketFactory: () => socket,
       reconnectDelay: 5000,
