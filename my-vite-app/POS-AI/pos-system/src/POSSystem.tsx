@@ -832,6 +832,7 @@ export default function POSSystem() {
     // Reemplaza con la URL de tu app en Heroku
     const socket = new SockJS('https://cocoapossystem-5ddefe7ae380.herokuapp.com/ws');
 
+
     const client = new Client({
       webSocketFactory: () => socket,
       reconnectDelay: 5000,
