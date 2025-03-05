@@ -12,7 +12,8 @@ export const Tabs: React.FC<TabsProps> = ({ children, activeTab, setActiveTab, c
     <div className={`${className || ""}`}>
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
-          return React.cloneElement(child, { activeTab, setActiveTab });
+          return React.cloneElement(child as any, { activeTab, setActiveTab });
+
         }
         return child;
       })}

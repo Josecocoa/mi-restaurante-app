@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "./components/ui/button";
 import { Card, CardContent } from "./components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
@@ -143,7 +143,8 @@ function CocinaScreen({
   tables: Table[];
   setTables: React.Dispatch<React.SetStateAction<Table[]>>;
 }) {
-  const bebidasCategory = categorias["bebidas"] || categorias["Bebidas 🥛"] || {};
+  // Se utiliza solo la clave con mayúsculas
+  const bebidasCategory = categorias["Bebidas 🥛"] || {};
   const bebidaProducts = new Set(getAllProductsFromCategory(bebidasCategory));
 
   const entrantes = categorias["Entrantes 🥙"]
@@ -332,8 +333,8 @@ function Cocina2Screen({
   tables: Table[];
   setTables: React.Dispatch<React.SetStateAction<Table[]>>;
 }) {
-  const bebidasCategory = categorias["bebidas"] || categorias["Bebidas 🥛"] || {};
-  const pizzasCategory = categorias["pizzas"] || categorias["Pizzas 🍕"] || {};
+  const bebidasCategory = categorias["Bebidas 🥛"] || {};
+  const pizzasCategory = categorias["Pizzas 🍕"] || {};
   const bebidaProducts = new Set(getAllProductsFromCategory(bebidasCategory));
   const pizzaProducts = new Set(getAllProductsFromCategory(pizzasCategory));
 
@@ -503,7 +504,7 @@ function ServicioScreen({
   tables: Table[];
   setTables: React.Dispatch<React.SetStateAction<Table[]>>;
 }) {
-  const bebidasCategory = categorias["bebidas"] || categorias["Bebidas 🥛"] || {};
+  const bebidasCategory = categorias["Bebidas 🥛"] || {};
   const bebidaProducts = new Set(getAllProductsFromCategory(bebidasCategory));
 
   const doneOrders = tables.flatMap((table) =>
@@ -672,9 +673,9 @@ function MesasTabComponent({
     return (
       <div className="p-4">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">Detalle de {table.name}</h2>
-          <Button onClick={() => onCobrar(table)} className="bg-purple-500 text-white px-2 py-1 rounded">
-            Cobrar
+          <h2 className="text-black text-xl font-bold">{table.name}</h2>
+          <Button className="bg-green-500 text-white px-4 py-2 rounded-md" onClick={() => setSelectedTableForService(null)}>
+            Ver comandas
           </Button>
         </div>
         <ul className="space-y-2">
@@ -701,7 +702,7 @@ function MesasTabComponent({
                   {order.modifiers.removed && order.modifiers.removed.length > 0 && (
                     <div className="text-red-500">
                       {order.modifiers.removed.map((mod, mIdx) => (
-                        <div key={`removed-${mIdx}`}> {mod.name}</div>
+                        <div key={`removed-${mIdx}`}>{mod.name}</div>
                       ))}
                     </div>
                   )}
@@ -1257,49 +1258,6 @@ export default function POSSystem() {
           </div>
         </div>
       );
-    } else {
-      const allTables = tables;
-      return (
-        <div className="p-2">
-          {allTables.length > 0 ? (
-            <div className="grid grid-cols-6 gap-2">
-              {allTables.map((table) => {
-                const { bgClass, textClass } = getTableClassesForGeneral(table);
-                const total = table.orders.reduce((acc, o) => acc + o.priceBase, 0);
-                return (
-                  <div key={table.id} className={`w-full h-full ${bgClass}`}>
-                    <Card
-                      className="cursor-pointer hover:shadow-lg transform transition bg-transparent h-full relative"
-                      style={{ backgroundColor: "transparent" }}
-                      onClick={() => setSelectedTableForService(table)}
-                    >
-                      {table.orders.some((order) => order.isSecond && !table.pedirSegundos) && (
-                        <div className="absolute top-0 right-0 w-5 h-5 bg-red-500 rounded-full"></div>
-                      )}
-                      <CardContent className="p-2 bg-transparent h-full" style={{ backgroundColor: "transparent" }}>
-                        <h2 className={textClass}>{table.name}</h2>
-                        {table.orders.length > 0 ? (
-                          <p className="text-lg font-bold">Total: {total.toFixed(2)}€</p>
-                        ) : (
-                          <p className="text-lg font-bold">Libre</p>
-                        )}
-                        {(table.notes || table.pickupTime) && (
-                          <div className="mt-1 space-y-1">
-                            {table.notes && <p className="text-lg font-bold">{table.notes}</p>}
-                            {table.pickupTime && <p className="text-lg font-bold">{table.pickupTime}</p>}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-center text-gray-500">No hay mesas.</p>
-          )}
-        </div>
-      );
     }
   }
 
@@ -1546,7 +1504,8 @@ export default function POSSystem() {
             ) : (
               <>
                 {(() => {
-                  let currentData = categorias[selectedCategory];
+                  // Aquí forzamos que se use la clave tal como está, usando un cast a any
+                  let currentData = (categorias as any)[selectedCategory];
                   if (selectedSubcategory) {
                     currentData = currentData[selectedSubcategory] || {};
                   }
