@@ -1,1 +1,1 @@
-/Users/a/Desktop/vite_react_ts_app/my-vite-app/POS-AI/Procfile.json
+web: java -Dserver.port=$PORT -jar target/pos-system-1.0-SNAPSHOT.jar
