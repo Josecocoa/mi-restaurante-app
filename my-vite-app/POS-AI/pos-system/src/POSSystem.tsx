@@ -630,7 +630,7 @@ function ReportesScreen({ sales }: { sales: Sale[] }) {
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Reportes</h1>
       {sales.length === 0 ? (
-        <p className="text-gray-500">vaya, aun no ha venido ninguna mesa.</p>
+        <p className="text-gray-500">si esto se ve hay cambios.</p>
       ) : (
         <div className="space-y-4">
           {sales.map((sale) => (
@@ -830,7 +830,7 @@ export default function POSSystem() {
 
   useEffect(() => {
     // Reemplaza con la URL de tu app en Heroku
-    const socket = new SockJS('http://localhost:8080/ws/');
+    const socket = new SockJS('https://cocoapossystem-5ddefe7ae380.herokuapp.com/ws/');
 
    const client = new Client({
       webSocketFactory: () => socket,
